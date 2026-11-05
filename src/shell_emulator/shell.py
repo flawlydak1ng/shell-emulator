@@ -3,9 +3,9 @@
 from dataclasses import dataclass
 
 from shell_emulator.parser import ParseError, parse_line
+from shell_emulator.vfs import Vfs, VfsError, clear_directory
 
 ROOT_PATH = "/"
-DEFAULT_VFS_NAME = "default"
 
 
 @dataclass
@@ -20,15 +20,21 @@ class CommandResult:
 class Shell:
     """Parses and executes commands of the emulator."""
 
-    def __init__(self, vfs_name=DEFAULT_VFS_NAME):
-        """Create a shell working with the VFS named ``vfs_name``."""
-        self.vfs_name = vfs_name
+    def __init__(self, vfs=None):
+        """Create a shell working with a VFS (the default one if None)."""
+        self.vfs = vfs if vfs is not None else Vfs.default()
         self.cwd = ROOT_PATH
         self._commands = {
             "ls": self._cmd_ls,
             "cd": self._cmd_cd,
             "exit": self._cmd_exit,
+            "vfs-init": self._cmd_vfs_init,
         }
+
+    @property
+    def vfs_name(self):
+        """Return the name of the current VFS."""
+        return self.vfs.name
 
     def prompt(self):
         """Return the input prompt shown before each command."""
@@ -68,3 +74,24 @@ class Shell:
         if args:
             return CommandResult(error="exit: too many arguments")
         return CommandResult(should_exit=True)
+
+    def _cmd_vfs_init(self, args):
+        """Replace the current VFS with the default one.
+
+        The physical directory of the VFS, if there is one, is cleared.
+        """
+        if args:
+            return CommandResult(error="vfs-init: too many arguments")
+        path = self.vfs.source_path
+        lines = []
+        if path is not None:
+            try:
+                clear_directory(path)
+            except VfsError as exc:
+                return CommandResult(error="vfs-init: {}".format(exc))
+            lines.append("vfs-init: physical directory cleared: " + path)
+        self.vfs = Vfs.default(path)
+        self.cwd = ROOT_PATH
+        lines.append("vfs-init: current VFS replaced with the default VFS")
+        lines.extend(self.vfs.summary_lines())
+        return CommandResult(output="\n".join(lines))

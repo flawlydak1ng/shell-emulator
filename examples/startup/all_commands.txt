@@ -1,0 +1,16 @@
+ls
+ls -l /tmp
+ls "My Documents" 'a  b' ""
+cd docs
+cd "docs/reports" /tmp
+cd
+foo bar
+ls "unclosed
+cd 'unclosed
+ls trailing\
+exit now
+vfs-init now
+vfs-init
+ls after_vfs_init
+vfs-init
+exit

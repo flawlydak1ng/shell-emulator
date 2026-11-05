@@ -9,8 +9,10 @@ try:
 except ImportError:
     tk = None
 
-from shell_emulator.config import Config, debug_lines
+from shell_emulator.config import Config
+from shell_emulator.startup import prepare
 from shell_emulator.shell import Shell
+from shell_emulator.vfs import Vfs
 
 
 @unittest.skipIf(tk is None, "tkinter is not installed")
@@ -25,7 +27,7 @@ class EmulatorWindowTest(unittest.TestCase):
             self.root = tk.Tk()
         except tk.TclError:
             self.skipTest("no display available")
-        self.window = EmulatorWindow(self.root, Shell("demo"))
+        self.window = EmulatorWindow(self.root, Shell(Vfs.default("/x/demo")))
 
     def tearDown(self):
         """Destroy the window if the test has not closed it already."""
@@ -60,7 +62,8 @@ class EmulatorWindowTest(unittest.TestCase):
             with open(path, "w", encoding="utf-8") as script:
                 script.write("ls one\nbad\n")
             config = Config(None, path)
-            self.window.start(config, debug_lines(config))
+            _vfs, messages = prepare(config)
+            self.window.start(config, messages)
         self.assertIn("[debug]   --script   = " + path, self.text())
         self.assertIn("demo:/$ ls one", self.text())
         self.assertIn("bad: command not found", self.text())

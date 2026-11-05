@@ -91,13 +91,14 @@ class EmulatorWindow:
         else:
             self.refresh()
 
-    def start(self, config, debug_lines):
-        """Show the debug output of the parameters, run the startup script.
+    def start(self, config, messages):
+        """Show the startup messages and run the startup script.
 
-        The window stays open for interactive work after the script.
+        ``messages`` is a list of ``(text, tag)`` items. The window stays
+        open for interactive work after the script, unless it has ``exit``.
         """
-        for line in debug_lines:
-            self.write(line, TAG_DEBUG)
+        for text, tag in messages:
+            self.write(text, tag)
         if config.script_path is not None:
             self.session.run_script(config.script_path)
 

@@ -1,11 +1,10 @@
 """Command line parameters of the emulator."""
 
 import argparse
-import os
 from dataclasses import dataclass
 from typing import List, Optional
 
-from shell_emulator.shell import DEFAULT_VFS_NAME
+from shell_emulator.vfs import DEFAULT_VFS_NAME, name_from_path
 
 PROGRAM_NAME = "shell_emulator"
 NOT_SET = "<not set>"
@@ -23,8 +22,7 @@ class Config:
         """Return the VFS name: the last component of the VFS path."""
         if self.vfs_path is None:
             return DEFAULT_VFS_NAME
-        absolute = os.path.abspath(self.vfs_path)
-        return os.path.basename(absolute) or absolute
+        return name_from_path(self.vfs_path)
 
 
 def build_parser():

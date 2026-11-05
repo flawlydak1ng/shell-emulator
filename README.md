@@ -6,9 +6,10 @@
 Python и tkinter. Практическая работа № 1, вариант 25 (дисциплина
 «Конфигурационное управление»).
 
-Состояние проекта: **этап 2 — конфигурация**. Эмулятор принимает
-параметры командной строки и умеет выполнять стартовый скрипт. Команды
-`ls` и `cd` пока являются заглушками.
+Состояние проекта: **этап 3 — VFS**. Эмулятор принимает параметры
+командной строки, выполняет стартовый скрипт и работает с виртуальной
+файловой системой в памяти. Команды `ls` и `cd` пока являются
+заглушками (логика появится на этапе 4).
 
 Требования: Python 3.9+ с модулем `tkinter` (в Linux:
 `sudo apt install python3-tk`). Сторонние пакеты не нужны.
@@ -30,7 +31,7 @@ run.sh, run.bat       запуск эмулятора
 
 | Параметр | Описание |
 |----------|----------|
-| `--vfs-path PATH` | путь к физическому расположению VFS (директория); её имя показывается в заголовке окна и в приглашении |
+| `--vfs-path PATH` | путь к физическому расположению VFS — директории на диске; её имя показывается в заголовке окна и в приглашении |
 | `--script PATH` | путь к стартовому скрипту с командами эмулятора |
 | `-h`, `--help` | справка |
 
@@ -38,6 +39,25 @@ run.sh, run.bat       запуск эмулятора
 все заданные параметры выводятся отладочными строками `[debug]` — и в
 окно эмулятора, и в консоль. Неизвестный параметр или параметр без
 значения — ошибка, код возврата 2.
+
+### VFS
+
+- Источник VFS — директория на диске пользователя (`--vfs-path`).
+  При запуске вся директория читается в память: вложенные папки,
+  пустые папки, файлы любого содержимого (файлы хранятся как `bytes`,
+  без перекодирования). Символические ссылки и специальные файлы не
+  загружаются.
+- Дальше все операции выполняются только в памяти. Эмулятор ничего не
+  распаковывает и не изменяет на диске; единственное исключение —
+  служебная команда `vfs-init`.
+- Если `--vfs-path` не указан, используется VFS по умолчанию — пустой
+  корневой каталог.
+- При запуске в окно и в консоль выводится описание загруженной VFS:
+  расположение, число каталогов и файлов, размер и дерево (отладочные
+  строки `[vfs]`).
+- Ошибки загрузки (`vfs: directory not found: ...`,
+  `vfs: not a directory: ...`, `vfs: cannot read ...`) выводятся в окно;
+  эмулятор продолжает работу с VFS по умолчанию.
 
 ### Стартовый скрипт
 
@@ -78,12 +98,24 @@ run.sh, run.bat       запуск эмулятора
 | `ls [арг...]` | заглушка: печатает своё имя и аргументы |
 | `cd [арг...]` | заглушка: печатает своё имя и аргументы |
 | `exit` | закрывает эмулятор |
+| `vfs-init` | заменяет текущую VFS на VFS по умолчанию (пустую) и **очищает физическую директорию VFS** (сама директория остаётся) |
+
+> **Внимание.** `vfs-init` необратимо удаляет всё содержимое директории,
+> указанной в `--vfs-path`. Для защиты команда отказывается очищать
+> корень файловой системы и домашнюю директорию. Не запускайте
+> `examples/startup/all_commands.txt` на `examples/vfs/*` напрямую —
+> используйте `scripts/stage3_all.sh` / `scripts/stage3_all.bat`, они
+> работают с временной копией.
 
 ### Ошибки
 
 - `shell: <cmd>: command not found` — неизвестная команда;
 - `shell: syntax error: ...` — незакрытая кавычка или `\` в конце строки;
-- `exit: too many arguments` — у `exit` не должно быть аргументов.
+- `exit: too many arguments`, `vfs-init: too many arguments` — у этих
+  команд не должно быть аргументов;
+- `vfs-init: directory not found: ...` — физическая директория VFS
+  исчезла; текущая VFS при этом не меняется;
+- `vfs: ...` — ошибки загрузки VFS (см. раздел «VFS»).
 
 ## 3. Сборка и тесты
 
@@ -101,7 +133,17 @@ run.bat [параметры]           # Windows
 ```
 scripts/stage2_basic.sh       scripts\stage2_basic.bat
 scripts/stage2_errors.sh      scripts\stage2_errors.bat
+scripts/stage3_variants.sh    scripts\stage3_variants.bat
+scripts/stage3_errors.sh      scripts\stage3_errors.bat
+scripts/stage3_all.sh         scripts\stage3_all.bat
 ```
+
+- `stage3_variants` — разные варианты VFS: минимальная (1 файл),
+  несколько файлов, 4 уровня вложенности, пустая директория, без VFS;
+- `stage3_errors` — ошибки загрузки VFS и `vfs-init` на временных
+  копиях всех вариантов;
+- `stage3_all` — стартовый скрипт `examples/startup/all_commands.txt`
+  со всеми командами этапов 1–3 на временной копии VFS.
 
 Тесты (из корня репозитория):
 
@@ -117,20 +159,42 @@ GUI-тесты автоматически пропускаются, если н�
 Запуск со стартовым скриптом и VFS:
 
 ```
-./run.sh --vfs-path examples/vfs/deep --script examples/startup/with_errors.txt
+./run.sh --vfs-path examples/vfs/deep --script examples/startup/vfs_view.txt
 ```
 
 ```
 [debug] emulator started with parameters:
 [debug]   --vfs-path = examples/vfs/deep
-[debug]   --script   = examples/startup/with_errors.txt
+[debug]   --script   = examples/startup/vfs_view.txt
 [debug]   VFS name   = deep
+[vfs] VFS 'deep', physical location: /home/user/lab/examples/vfs/deep
+[vfs] 4 directories, 6 files, 151 bytes (kept in memory)
+/
+|-- docs/
+|   |-- reports/
+|   |   |-- 2026/
+|   |   |   |-- q1.txt (20 bytes)
+|   |   |   `-- q2.txt (20 bytes)
+|   |   `-- summary.txt (29 bytes)
+|   `-- guide.txt (16 bytes)
+|-- src/
+|   `-- app.txt (34 bytes)
+`-- root.txt (32 bytes)
 deep:/$ ls
 ls: args = []
-deep:/$ unknown_command arg
-shell: unknown_command: command not found
-deep:/$ ls after_error
-ls: args = ['after_error']
+deep:/$ cd docs
+cd: args = ['docs']
+```
+
+Сброс VFS (на копии директории!):
+
+```
+deep:/$ vfs-init
+vfs-init: physical directory cleared: /tmp/deep
+vfs-init: current VFS replaced with the default VFS
+[vfs] VFS 'deep', physical location: /tmp/deep
+[vfs] 0 directories, 0 files, 0 bytes (kept in memory)
+/
 ```
 
 Интерактивный диалог:

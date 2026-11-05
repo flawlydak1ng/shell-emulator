@@ -1,9 +1,13 @@
 """Tests of the command interpreter and of the session."""
 
+import os
+import shutil
+import tempfile
 import unittest
 
 from shell_emulator.session import TAG_ERROR, TAG_INPUT, TAG_OUTPUT, Session
 from shell_emulator.shell import Shell
+from shell_emulator.vfs import Vfs
 
 
 class ShellTest(unittest.TestCase):
@@ -57,7 +61,62 @@ class ShellTest(unittest.TestCase):
 
     def test_prompt_contains_vfs_name(self):
         """The prompt shows the VFS name and the current directory."""
-        self.assertEqual(Shell("demo").prompt(), "demo:/$ ")
+        self.assertEqual(Shell(Vfs.default("/x/demo")).prompt(), "demo:/$ ")
+
+
+class VfsInitTest(unittest.TestCase):
+    """The vfs-init command."""
+
+    def setUp(self):
+        """Create a VFS directory with a nested file and load it."""
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = os.path.join(tmp.name, "my_vfs")
+        os.makedirs(os.path.join(self.dir, "sub"))
+        with open(os.path.join(self.dir, "sub", "f.txt"), "w") as target:
+            target.write("data")
+        self.shell = Shell(Vfs.from_directory(self.dir))
+
+    def test_vfs_init_replaces_vfs_and_clears_disk(self):
+        """The VFS becomes empty in memory and on the disk."""
+        result = self.shell.execute("vfs-init")
+        self.assertEqual(result.error, "")
+        self.assertIn("physical directory cleared", result.output)
+        self.assertIn("0 directories, 0 files", result.output)
+        self.assertEqual(self.shell.vfs.root.children, {})
+        self.assertTrue(os.path.isdir(self.dir))
+        self.assertEqual(os.listdir(self.dir), [])
+
+    def test_vfs_init_keeps_vfs_location(self):
+        """After vfs-init the VFS is still bound to its directory."""
+        self.shell.execute("vfs-init")
+        self.assertEqual(self.shell.vfs.source_path, self.dir)
+        self.assertEqual(self.shell.vfs_name, "my_vfs")
+
+    def test_vfs_init_twice(self):
+        """Repeating vfs-init is harmless."""
+        self.shell.execute("vfs-init")
+        self.assertEqual(self.shell.execute("vfs-init").error, "")
+
+    def test_vfs_init_without_directory(self):
+        """Without a physical directory only the memory is reset."""
+        shell = Shell()
+        result = shell.execute("vfs-init")
+        self.assertNotIn("cleared", result.output)
+        self.assertEqual(result.error, "")
+
+    def test_vfs_init_rejects_arguments(self):
+        """Arguments are not accepted and nothing is deleted."""
+        result = self.shell.execute("vfs-init now")
+        self.assertIn("too many arguments", result.error)
+        self.assertTrue(os.path.exists(os.path.join(self.dir, "sub", "f.txt")))
+
+    def test_vfs_init_error_when_directory_vanished(self):
+        """If the directory is gone the error is reported."""
+        shutil.rmtree(self.dir)
+        result = self.shell.execute("vfs-init")
+        self.assertIn("vfs-init:", result.error)
+        self.assertIn("f.txt", "\n".join(self.shell.vfs.tree_lines()))
 
 
 class SessionTest(unittest.TestCase):

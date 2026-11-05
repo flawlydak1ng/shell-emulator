@@ -2,20 +2,29 @@
 
 import tkinter as tk
 
-from shell_emulator.config import debug_lines, parse_args
+from shell_emulator.config import parse_args
 from shell_emulator.gui import EmulatorWindow
 from shell_emulator.shell import Shell
+from shell_emulator.startup import prepare
+
+
+def echo(text):
+    """Print a line to the console even if it cannot encode the text."""
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        print(text.encode("ascii", "replace").decode("ascii"))
 
 
 def main(argv=None):
-    """Parse parameters, start the emulator window and run its loop."""
+    """Parse parameters, load the VFS, show the window, run the loop."""
     config = parse_args(argv)
-    lines = debug_lines(config)
-    for line in lines:
-        print(line)
+    vfs, messages = prepare(config)
+    for text, _tag in messages:
+        echo(text)
     root = tk.Tk()
-    window = EmulatorWindow(root, Shell(config.vfs_name()))
-    root.after(0, window.start, config, lines)
+    window = EmulatorWindow(root, Shell(vfs))
+    root.after(0, window.start, config, messages)
     root.mainloop()
     return 0
 
