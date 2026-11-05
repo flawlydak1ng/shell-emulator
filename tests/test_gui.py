@@ -1,5 +1,7 @@
 """Smoke tests of the graphical interface (skipped without a display)."""
 
+import os
+import tempfile
 import unittest
 
 try:
@@ -7,6 +9,7 @@ try:
 except ImportError:
     tk = None
 
+from shell_emulator.config import Config, debug_lines
 from shell_emulator.shell import Shell
 
 
@@ -41,18 +44,30 @@ class EmulatorWindowTest(unittest.TestCase):
 
     def test_command_is_echoed_with_output(self):
         """A submitted command and its output appear in the window."""
-        self.window.submit('ls "a b"')
+        self.window.session.submit('ls "a b"')
         self.assertIn("demo:/$ ls \"a b\"", self.text())
         self.assertIn("ls: args = ['a b']", self.text())
 
     def test_error_is_shown(self):
         """An unknown command produces an error line."""
-        self.window.submit("foo")
+        self.window.session.submit("foo")
         self.assertIn("foo: command not found", self.text())
+
+    def test_start_shows_debug_and_runs_script(self):
+        """Startup shows the debug lines and plays the script."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "s.txt")
+            with open(path, "w", encoding="utf-8") as script:
+                script.write("ls one\nbad\n")
+            config = Config(None, path)
+            self.window.start(config, debug_lines(config))
+        self.assertIn("[debug]   --script   = " + path, self.text())
+        self.assertIn("demo:/$ ls one", self.text())
+        self.assertIn("bad: command not found", self.text())
 
     def test_exit_closes_window(self):
         """The exit command destroys the window."""
-        self.window.submit("exit")
+        self.window.session.submit("exit")
         with self.assertRaises(tk.TclError):
             self.root.winfo_exists()
             self.root.title()

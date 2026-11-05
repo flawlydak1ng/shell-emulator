@@ -1,0 +1,6 @@
+ls
+ls -l /tmp
+cd "My Documents"
+cd 'a  b' /tmp
+ls "x y" z
+exit

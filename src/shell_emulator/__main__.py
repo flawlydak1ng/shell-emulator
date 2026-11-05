@@ -2,14 +2,20 @@
 
 import tkinter as tk
 
+from shell_emulator.config import debug_lines, parse_args
 from shell_emulator.gui import EmulatorWindow
 from shell_emulator.shell import Shell
 
 
-def main():
-    """Start the emulator window and run its event loop."""
+def main(argv=None):
+    """Parse parameters, start the emulator window and run its loop."""
+    config = parse_args(argv)
+    lines = debug_lines(config)
+    for line in lines:
+        print(line)
     root = tk.Tk()
-    EmulatorWindow(root, Shell())
+    window = EmulatorWindow(root, Shell(config.vfs_name()))
+    root.after(0, window.start, config, lines)
     root.mainloop()
     return 0
 

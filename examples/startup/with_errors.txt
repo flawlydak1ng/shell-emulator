@@ -1,0 +1,9 @@
+ls
+unknown_command arg
+cd "unclosed
+ls after_error
+
+exit now
+cd /tmp
+exit
+ls this_line_is_never_run

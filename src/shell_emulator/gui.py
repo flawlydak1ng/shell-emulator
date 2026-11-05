@@ -31,7 +31,7 @@ class EmulatorWindow:
         """Build the window widgets for the given shell."""
         self.root = root
         self.shell = shell
-        self.session = Session(shell, self.write)
+        self.session = Session(shell, self.write, self._after)
         self.history = []
         self.history_pos = 0
         self._build_widgets()
@@ -84,13 +84,22 @@ class EmulatorWindow:
         self.output.configure(state=tk.DISABLED)
         self.output.see(tk.END)
 
-    def submit(self, line):
-        """Run a command line; close the window if the shell exits."""
-        result = self.session.submit(line)
-        self.refresh()
+    def _after(self, result):
+        """Refresh the window after a command; close it on ``exit``."""
         if result.should_exit:
             self.root.destroy()
-        return result
+        else:
+            self.refresh()
+
+    def start(self, config, debug_lines):
+        """Show the debug output of the parameters, run the startup script.
+
+        The window stays open for interactive work after the script.
+        """
+        for line in debug_lines:
+            self.write(line, TAG_DEBUG)
+        if config.script_path is not None:
+            self.session.run_script(config.script_path)
 
     def _on_enter(self, _event):
         """Handle the Enter key in the input line."""
@@ -99,7 +108,7 @@ class EmulatorWindow:
         if line.strip():
             self.history.append(line)
         self.history_pos = len(self.history)
-        self.submit(line)
+        self.session.submit(line)
 
     def _show_history(self):
         """Put the history item at the current position into the entry."""
